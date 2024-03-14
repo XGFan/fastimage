@@ -683,6 +683,10 @@ func pcx(b []byte, info *Info) {
 	}
 }
 
+/*
+从i开始跳过space,返回第一个不为space的下标
+如果b[i]不是space，那么返回i
+*/
 func skipSpace(b []byte, i int) (j int) {
 	_ = b[len(b)-1]
 	for j = i; j < len(b); j++ {
@@ -693,6 +697,12 @@ func skipSpace(b []byte, i int) (j int) {
 	return
 }
 
+/*
+从下标i开始，读取到不为space的slice
+如果下标i指向的值为space，返回空slice和j(i)
+即返回的slice一定不包括space,
+返回的下标j指向的值一定为space,
+*/
 func readNonSpace(b []byte, i int) (p []byte, j int) {
 	_ = b[len(b)-1]
 	for j = i; j < len(b); j++ {
@@ -704,6 +714,10 @@ func readNonSpace(b []byte, i int) (p []byte, j int) {
 	return
 }
 
+/*
+从下标i开始，读取一行数据（包括最后的\n）
+返回这行数据，以及不在此行的下标
+*/
 func readLine(b []byte, i int) (p []byte, j int) {
 	_ = b[len(b)-1]
 	for j = i; j < len(b); j++ {
