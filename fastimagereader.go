@@ -81,11 +81,11 @@ func GetInfoReader(file io.ReadSeekCloser) (info Info) {
 		}
 	case 'M':
 		if p[1] == 'M' && p[2] == '\x00' && p[3] == '\x2a' {
-			tiff(p, &info, bigEndian) //TODO
+			TiffReader(file, &info, bigEndian)
 		}
 	case 'I':
 		if p[1] == 'I' && p[2] == '\x2a' && p[3] == '\x00' {
-			tiff(p, &info, littleEndian) //TODO
+			TiffReader(file, &info, littleEndian)
 		}
 	case '8':
 		if p[1] == 'B' && p[2] == 'P' && p[3] == 'S' {
@@ -199,14 +199,13 @@ func XbmReader(file io.ReadSeeker, info *Info) {
 
 	b = readerSkipSpace(reader)
 	p = readerReadNonSpaceSlice(reader)
-	if !(len(p) == 7 &&
-		p[6] == 'e' &&
-		p[0] == '#' &&
-		p[1] == 'd' &&
-		p[2] == 'e' &&
-		p[3] == 'f' &&
-		p[4] == 'i' &&
-		p[5] == 'n') {
+	if !(b == '#' && len(p) == 6 &&
+		p[0] == 'd' &&
+		p[1] == 'e' &&
+		p[2] == 'f' &&
+		p[3] == 'i' &&
+		p[4] == 'n' &&
+		p[5] == 'e') {
 		return
 	}
 	b = readerSkipSpace(reader)
@@ -245,18 +244,17 @@ func XpmReader(file io.ReadSeeker, info *Info) {
 }
 
 func TiffReader(file io.ReadSeeker, info *Info, order byteOrder) {
-	_, _ = file.Seek(0, 0)
-	bytes := make([]byte, 8)
-	_, _ = file.Read(bytes) //FIXME
-	i := int(order.Uint32(bytes[4:8]))
-	file.Seek(int64(i), 0)
-	bytes = make([]byte, 6)
-	_, _ = file.Read(bytes) //FIXME
-	n := int(order.Uint16(bytes[2:4]))
-
-	for i = 0; i < n; i++ {
-		bytes = make([]byte, 12)
-		_, _ = file.Read(bytes) //FIXME
+	bytes := make([]byte, 12)
+	_, _ = file.Seek(4, 0)
+	_, _ = file.Read(bytes[:4]) //FIXME
+	offset := int64(order.Uint32(bytes[:4]))
+	_, _ = file.Seek(offset+2, 0)
+	_, _ = file.Read(bytes[:2])
+	n := int(order.Uint16(bytes[:2]))
+	_, _ = file.Seek(offset+2, 0)
+	i := int(offset) + 2
+	for ; i < n*12; i += 12 {
+		_, _ = file.Read(bytes)
 
 		tag := order.Uint16(bytes[:2])
 		datatype := order.Uint16(bytes[2:4])
