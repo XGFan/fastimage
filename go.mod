@@ -1,3 +1,3 @@
-module github.com/phuslu/fastimage
+module github.com/XGFan/fastimage
 
-go 1.13
+go 1.21

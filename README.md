@@ -1,49 +1,64 @@
 # fastimage - fast image info for go
 
-[![godoc][godoc-img]][godoc] [![release][release-img]][release] [![goreport][goreport-img]][goreport] [![coverage][coverage-img]][coverage]
+Fork of [phuslu/fastimage](https://github.com/phuslu/fastimage): reads an image's type and dimensions from its header without decoding pixels.
 
 ## Features
 
-* Zero Dependencies - no std/3rd imports
-* High Performance - hand-wringing DFA instead of regex/wildcard expression
-* Widely Format - bmp/bpm/gif/jpeg/mng/pbm/pcx/pgm/png/ppm/psd/ras/tiff/webp/xbm/xpm
+* Header only - `GetInfoReader` reads just the bytes it needs (one 4 KB window for most formats, skipping over large JPEG metadata)
+* Safe on untrusted input - every read is bounds-checked; truncated or malformed files report `Unknown` instead of panicking or guessing
+* Orientation aware - EXIF orientation of JPEG/TIFF, `irot`/`imir` of HEIF/AVIF and the JPEG XL header
+* Widely Format - avif/bmp/cur/gif/heic/heif/ico/jpeg/jxl/mng/pbm/pcx/pgm/png/ppm/psd/qoi/ras/rgb/tiff/webp/xbm/xpm/xv(pam)
 
 ### Getting Started
 
-try on https://play.golang.org/p/8yHaCknD1Rm
 ```go
 package main
 
 import (
 	"fmt"
-	"github.com/phuslu/fastimage"
+	"os"
+
+	"github.com/XGFan/fastimage"
 )
 
-var data = []byte("RIFF,-\x00\x00WEBPVP8X\n\x00\x00\x00" +
-    "\x10\x00\x00\x00\x8f\x01\x00,\x01\x00VP8X\n\x00\x00\x00\x10\xb2" +
-    "\x01\x00\x00WEB\x01\x00VP8X\n\x00\x00\x00\x10\xb2\x01\x00" +
-    "\x00WEB\x01\x00VP8X\n\x00\x00\x00\x10\xb2\x01\x00\x00W" +
-    "EB\x01\x00VP8X\n\x00\x00\x00\x10\xb2\x01\x00\x00WEB"")
-
 func main() {
-	fmt.Printf("%+v\n", fastimage.GetInfo(data))
-}
+	f, err := os.Open("photo.jpg")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
 
-// Output: {Type:webp Width:400 Height:301}
+	info := fastimage.GetInfoReader(f)
+	w, h := info.DisplaySize()
+	fmt.Printf("%s %dx%d orientation=%d display=%dx%d\n", info.Type, info.Width, info.Height, info.Orientation, w, h)
+}
 ```
+
+### API
+
+| Function | Description |
+| --- | --- |
+| `GetType(p []byte) Type` | Type from the file signature only. |
+| `GetInfo(p []byte) Info` | Type and size from bytes in memory; `p` must contain the header (for JPEG/TIFF/HEIF that can be well past the first KB). |
+| `GetInfoReader(r io.Reader) Info` | Same from a reader, reading only what is needed. `io.ReaderAt` (e.g. `*os.File`) is read from offset 0, `io.ReadSeeker` relative to its current position, any other `io.Reader` forward only. The reader is not closed. |
+
+Reader mode stops after about 4 MB of reads (1024 windows) and a forward-only reader is not followed past 64 MB, so a crafted file cannot cause unbounded I/O; a file whose size lies beyond that reports `Unknown`.
+
+`Info.Width`/`Info.Height` are the stored pixel dimensions. `Info.Orientation` is the EXIF orientation (1-8, 0 when the file has none); `Info.DisplaySize()` returns the size after applying it (swapped for 5-8). ICO/CUR report their largest image.
 
 ### Command Tool
 ```bash
-$ go get github.com/phuslu/fastimage/cmd/fastimage
+$ go install github.com/XGFan/fastimage/cmd/fastimage@latest
 $ fastimage banner.png
 png image/png 320 50
 ```
 
-[godoc-img]: http://img.shields.io/badge/godoc-reference-blue.svg
-[godoc]: https://godoc.org/github.com/phuslu/fastimage
-[release-img]: https://img.shields.io/github/v/tag/phuslu/fastimage?label=release
-[release]: https://github.com/phuslu/fastimage/releases
-[goreport-img]: https://goreportcard.com/badge/github.com/phuslu/fastimage
-[goreport]: https://goreportcard.com/report/github.com/phuslu/fastimage
-[coverage-img]: http://gocover.io/_badge/github.com/phuslu/fastimage
-[coverage]: https://gocover.io/github.com/phuslu/fastimage
+### Testing
+
+```bash
+go test .
+go test -run '^$' -fuzz FuzzGetInfo -fuzztime 60s .
+go test -run '^$' -bench . -benchmem .
+```
+
+Fixtures in `testdata/` were generated with ImageMagick, libheif `heif-enc` and libjxl `cjxl`; expected values in the tests come from `magick identify`, `heif-info` and `jxlinfo`.

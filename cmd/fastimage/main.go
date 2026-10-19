@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/phuslu/fastimage"
+	"github.com/XGFan/fastimage"
 )
 
 func main() {
@@ -22,15 +22,7 @@ func main() {
 	}
 	defer file.Close()
 
-	data := make([]byte, 1024)
-	n, err := file.Read(data[:])
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "read file error: %+v", err)
-		os.Exit(1)
-	}
-	data = data[:n]
-
-	info := fastimage.GetInfo(data)
+	info := fastimage.GetInfoReader(file)
 	if info.Type == fastimage.Unknown {
 		os.Exit(1)
 	}
